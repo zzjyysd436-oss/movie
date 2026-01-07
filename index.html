@@ -2,62 +2,58 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>我的私人影院</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>私人影院 - 兼容版</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/artplayer/dist/artplayer.js"></script>
     <style>
-        :root { --bg: #0b0c10; --card: #1f2833; --accent: #66fcf1; --text: #ffffff; }
-        body { background: var(--bg); color: var(--text); font-family: sans-serif; margin: 0; padding-bottom: 50px; }
-        .header { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: #000; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid #333; }
-        .search-bar { display: flex; background: #222; border-radius: 20px; padding: 4px 12px; border: 1px solid #444; width: 60%; }
-        .search-bar input { background: transparent; border: none; color: #fff; outline: none; width: 100%; font-size: 14px; }
-        .player-container { width: 100%; background: #000; display: none; }
-        .player-container.active { display: block; }
+        :root { --bg: #0f172a; --accent: #38bdf8; --card: #1e293b; }
+        body { background: var(--bg); color: #fff; font-family: sans-serif; margin: 0; }
+        .nav { background: #000; padding: 15px; display: flex; gap: 10px; position: sticky; top: 0; z-index: 10; }
+        .nav input { flex: 1; padding: 8px; border-radius: 5px; border: none; }
+        .player-box { width: 100%; display: none; background: #000; }
+        .player-box.active { display: block; }
         #artplayer { width: 100%; aspect-ratio: 16/9; }
-        .ep-list { padding: 10px; display: flex; flex-wrap: wrap; gap: 8px; max-height: 150px; overflow-y: auto; }
-        .ep-btn { background: #222; color: #fff; border: 1px solid #444; padding: 5px 10px; border-radius: 4px; font-size: 12px; }
+        .ep-list { padding: 10px; display: flex; flex-wrap: wrap; gap: 5px; }
+        .ep-btn { background: #334155; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
         .ep-btn.active { background: var(--accent); color: #000; }
         .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 10px; }
         @media (min-width: 768px) { .grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); } }
-        .card { background: var(--card); border-radius: 8px; overflow: hidden; position: relative; }
+        .card { background: var(--card); border-radius: 8px; overflow: hidden; text-align: center; cursor: pointer; }
         .card img { width: 100%; aspect-ratio: 3/4; object-fit: cover; }
-        .card-name { padding: 5px; font-size: 12px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .pagination { display: flex; justify-content: center; align-items: center; gap: 20px; margin-top: 20px; }
-        .nav-btn { background: var(--accent); color: #000; border: none; padding: 5px 15px; border-radius: 4px; font-weight: bold; }
+        .card div { padding: 8px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .status { text-align: center; padding: 20px; color: var(--accent); }
     </style>
 </head>
 <body>
     <div id="app">
-        <div class="header">
-            <div style="color:var(--accent); font-weight:bold;">AI 影院</div>
-            <div class="search-bar">
-                <input v-model="wd" @keyup.enter="search" placeholder="搜索影片...">
-                <button @click="search" style="background:none; border:none; color:#fff;">🔍</button>
-            </div>
+        <div class="nav">
+            <input v-model="wd" @keyup.enter="search" placeholder="搜索资源...">
+            <button @click="search" style="padding: 0 15px;">搜索</button>
         </div>
 
-        <div :class="['player-container', { active: currentVod }]">
+        <div :class="['player-box', {active: currentVod}]">
             <div id="artplayer"></div>
             <div class="ep-list">
-                <button v-for="(ep, index) in playlist" :class="['ep-btn', {active: currentEpIndex === index}]" @click="playVideo(ep.url, index)">{{ ep.name }}</button>
+                <button v-for="(ep, idx) in playlist" :class="['ep-btn', {active: epIdx === idx}]" @click="play(ep.url, idx)">{{ep.name}}</button>
             </div>
         </div>
 
-        <div v-if="loading" style="text-align:center; padding:50px;">加载中...</div>
-        <div class="grid" v-else>
-            <div v-for="item in list" class="card" @click="getDetails(item.vod_id)">
+        <div v-if="loading" class="status">正在尝试连接资源站 (可能会有延迟)...</div>
+        
+        <div class="grid">
+            <div v-for="item in list" class="card" @click="getDetail(item.vod_id)">
                 <img :src="item.vod_pic" referrerpolicy="no-referrer">
-                <div class="card-name">{{ item.vod_name }}</div>
+                <div>{{ item.vod_name }}</div>
             </div>
         </div>
 
-        <div class="pagination">
-            <button class="nav-btn" @click="goPage(page - 1)" :disabled="page <= 1">上一页</button>
-            <span>{{ page }} / {{ pageCount }}</span>
-            <button class="nav-btn" @click="goPage(page + 1)" :disabled="page >= pageCount">下一页</button>
+        <div style="text-align:center; padding: 20px;" v-if="list.length">
+            <button @click="changePage(-1)">上一页</button>
+            <span style="margin:0 15px">{{page}} / {{pageCount}}</span>
+            <button @click="changePage(1)">下一页</button>
         </div>
     </div>
 
@@ -65,9 +61,13 @@
         const { createApp, ref, onMounted } = Vue;
         createApp({
             setup() {
-                // 重点：使用代理地址绕过手机浏览器拦截
-                const baseApi = 'https://360zyzz.com/api.php/provide/vod/';
-                const proxyUrl = 'https://api.allorigins.win/raw?url=';
+                const targetApi = 'https://360zyzz.com/api.php/provide/vod/';
+                // 尝试多个不同的跨域代理地址，防止其中一个失效
+                const proxies = [
+                    'https://api.allorigins.win/raw?url=',
+                    'https://thingproxy.freeboard.io/fetch/',
+                    'https://cors-anywhere.azm.workers.dev/'
+                ];
                 
                 const list = ref([]);
                 const page = ref(1);
@@ -76,34 +76,49 @@
                 const loading = ref(false);
                 const currentVod = ref(null);
                 const playlist = ref([]);
-                const currentEpIndex = ref(0);
+                const epIdx = ref(0);
                 let art = null;
 
-                const fetchData = async (p = 1, k = '') => {
+                const request = async (url) => {
+                    // 循环尝试不同的代理方案
+                    for (let p of proxies) {
+                        try {
+                            const res = await axios.get(p + encodeURIComponent(url), { timeout: 8000 });
+                            if (res.data) return res.data;
+                        } catch (e) { console.warn(`代理 ${p} 尝试失败，切换中...`); }
+                    }
+                    throw new Error("所有连接方案均失败，请确认您的网络是否能访问该资源站。");
+                };
+
+                const fetchData = async (p = 1) => {
                     loading.value = true;
                     try {
-                        let target = `${baseApi}?ac=videolist&pg=${p}`;
-                        if (k) target += `&wd=${encodeURIComponent(k)}`;
-                        const res = await axios.get(proxyUrl + encodeURIComponent(target));
-                        list.value = res.data.list;
-                        page.value = parseInt(res.data.page);
-                        pageCount.value = parseInt(res.data.pagecount);
-                    } catch (e) { alert("手机访问受限，请尝试刷新或更换网络"); }
+                        let url = `${targetApi}?ac=videolist&pg=${p}`;
+                        if (wd.value) url += `&wd=${encodeURIComponent(wd.value)}`;
+                        const data = await request(url);
+                        list.value = data.list || [];
+                        page.value = parseInt(data.page);
+                        pageCount.value = parseInt(data.pagecount);
+                    } catch (e) { alert(e.message); }
                     loading.value = false;
                 };
 
-                const getDetails = async (id) => {
-                    const target = `${baseApi}?ac=detail&ids=${id}`;
-                    const res = await axios.get(proxyUrl + encodeURIComponent(target));
-                    const vod = res.data.list[0];
-                    currentVod.value = vod;
-                    playlist.value = vod.vod_play_url.split('#').map(i => ({name: i.split('$')[0], url: i.split('$')[1]}));
-                    playVideo(playlist.value[0].url, 0);
-                    window.scrollTo({top: 0, behavior: 'smooth'});
+                const getDetail = async (id) => {
+                    try {
+                        const data = await request(`${targetApi}?ac=detail&ids=${id}`);
+                        const vod = data.list[0];
+                        currentVod.value = vod;
+                        playlist.value = vod.vod_play_url.split('#').map(i => ({
+                            name: i.split('$')[0],
+                            url: i.split('$')[1]
+                        })).filter(i => i.url && i.url.includes('m3u8'));
+                        if (playlist.value.length) play(playlist.value[0].url, 0);
+                        window.scrollTo({top: 0, behavior: 'smooth'});
+                    } catch (e) { alert("获取详情失败"); }
                 };
 
-                const playVideo = (url, index) => {
-                    currentEpIndex.value = index;
+                const play = (url, idx) => {
+                    epIdx.value = idx;
                     if (art) art.destroy();
                     art = new Artplayer({
                         container: '#artplayer',
@@ -122,11 +137,11 @@
                     });
                 };
 
-                const search = () => fetchData(1, wd.value);
-                const goPage = (p) => fetchData(p, wd.value);
-                onMounted(() => fetchData());
+                const search = () => { page.value = 1; fetchData(1); };
+                const changePage = (step) => { fetchData(page.value + step); };
 
-                return { list, page, pageCount, wd, loading, currentVod, playlist, currentEpIndex, search, goPage, getDetails, playVideo };
+                onMounted(() => fetchData());
+                return { list, page, pageCount, wd, loading, currentVod, playlist, epIdx, search, changePage, getDetail, play };
             }
         }).mount('#app');
     </script>
