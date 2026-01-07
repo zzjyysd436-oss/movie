@@ -2,79 +2,91 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>极简私人影院</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>我的私人影院</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/artplayer/dist/artplayer.js"></script>
     <style>
         :root { --bg: #0b0c10; --card: #1f2833; --accent: #66fcf1; --text: #ffffff; }
-        body { background: var(--bg); color: var(--text); font-family: sans-serif; margin: 0; }
+        body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; overflow-x: hidden; }
         
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+
         /* Header */
-        .header { display: flex; justify-content: space-between; align-items: center; padding: 15px 40px; background: #000; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid #333; }
-        .search-bar { display: flex; background: #222; border-radius: 20px; padding: 5px 15px; border: 1px solid #444; }
-        .search-bar input { background: transparent; border: none; color: #fff; outline: none; width: 200px; }
+        .header { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background: rgba(0,0,0,0.9); position: sticky; top: 0; z-index: 100; border-bottom: 1px solid #222; }
+        .logo { font-size: 1.2rem; color: var(--accent); font-weight: bold; }
+        .search-bar { display: flex; background: #222; border-radius: 20px; padding: 4px 12px; border: 1px solid #444; width: 50%; max-width: 300px; }
+        .search-bar input { background: transparent; border: none; color: #fff; outline: none; width: 100%; font-size: 14px; }
         
         /* Player Area */
-        .player-container { width: 100%; background: #000; padding: 20px 0; display: none; border-bottom: 2px solid var(--accent); }
+        .player-container { width: 100%; background: #000; padding: 10px 0; display: none; }
         .player-container.active { display: block; }
-        #artplayer { width: 90%; max-width: 1000px; height: 500px; margin: 0 auto; border-radius: 8px; overflow: hidden; }
-        .episode-list { width: 90%; max-width: 1000px; margin: 15px auto; display: flex; flex-wrap: wrap; gap: 10px; }
-        .ep-btn { background: #333; color: #fff; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 13px; }
-        .ep-btn:hover { background: var(--accent); color: #000; }
-        .ep-btn.active { background: var(--accent); color: #000; font-weight: bold; }
+        #artplayer { width: 100%; aspect-ratio: 16/9; max-width: 1000px; margin: 0 auto; }
+        
+        .episode-box { width: 95%; max-width: 1000px; margin: 15px auto; }
+        .episode-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px; max-height: 200px; overflow-y: auto; padding: 5px; }
+        .ep-btn { background: #222; color: #ccc; border: 1px solid #333; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ep-btn.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: bold; }
 
-        /* Grid */
-        .content { padding: 30px; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 20px; }
-        .card { background: var(--card); border-radius: 10px; overflow: hidden; cursor: pointer; transition: 0.3s; position: relative; }
-        .card:hover { transform: translateY(-10px); box-shadow: 0 5px 15px rgba(102, 252, 241, 0.2); }
-        .card img { width: 100%; height: 230px; object-fit: cover; }
-        .card-name { padding: 10px; font-size: 14px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .remark { position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.7); color: var(--accent); font-size: 10px; padding: 2px 5px; border-radius: 3px; }
+        /* Grid - 适配手机 */
+        .content { padding: 15px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 15px; }
+        @media (min-width: 768px) { .grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 20px; } }
 
-        .pagination { text-align: center; margin: 40px; }
-        button.nav-btn { background: transparent; border: 1px solid var(--accent); color: var(--accent); padding: 8px 20px; cursor: pointer; border-radius: 5px; margin: 0 10px; }
-        button:disabled { border-color: #444; color: #444; }
+        .card { background: var(--card); border-radius: 8px; overflow: hidden; cursor: pointer; transition: 0.3s; position: relative; }
+        .card:active { transform: scale(0.95); }
+        .card img { width: 100%; aspect-ratio: 3/4; object-fit: cover; background: #222; }
+        .card-name { padding: 8px; font-size: 12px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .remark { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.7); color: var(--accent); font-size: 9px; padding: 2px 4px; border-radius: 2px; }
+
+        .pagination { text-align: center; margin: 30px 0; display: flex; justify-content: center; align-items: center; gap: 15px; }
+        button.nav-btn { background: #1a1a1a; border: 1px solid #444; color: #fff; padding: 6px 15px; border-radius: 5px; font-size: 14px; }
+        button.nav-btn:active { background: var(--accent); color: #000; }
+        button:disabled { opacity: 0.3; }
     </style>
 </head>
 <body>
     <div id="app">
         <div class="header">
-            <div style="font-size: 22px; color: var(--accent); font-weight: bold;">AI 影院</div>
+            <div class="logo">PRIVATE VOD</div>
             <div class="search-bar">
-                <input v-model="wd" @keyup.enter="search" placeholder="输入关键词...">
-                <button @click="search" style="background:none; border:none; cursor:pointer;">🔍</button>
+                <input v-model="wd" @keyup.enter="search" placeholder="搜索电影/剧集...">
+                <button @click="search" style="background:none; border:none; cursor:pointer; padding:0 5px;">🔍</button>
             </div>
         </div>
 
         <div :class="['player-container', { active: currentVod }]">
             <div id="artplayer"></div>
-            <div class="episode-list">
-                <button v-for="(ep, index) in playlist" 
-                        :key="index" 
-                        :class="['ep-btn', { active: currentEpIndex === index }]"
-                        @click="playVideo(ep.url, index)">
-                    {{ ep.name }}
-                </button>
+            <div class="episode-box">
+                <div style="margin-bottom: 10px; font-size: 14px; color: var(--accent);">选集：{{ currentVod?.vod_name }}</div>
+                <div class="episode-list">
+                    <button v-for="(ep, index) in playlist" 
+                            :key="index" 
+                            :class="['ep-btn', { active: currentEpIndex === index }]"
+                            @click="playVideo(ep.url, index)">
+                        {{ ep.name }}
+                    </button>
+                </div>
             </div>
-            <div style="text-align: center; padding: 10px; color: #888;">正在播放：{{ currentVod?.vod_name }} - {{ playlist[currentEpIndex]?.name }}</div>
         </div>
 
         <div class="content">
-            <div class="grid">
+            <div v-if="loading" style="text-align: center; padding: 50px; color: var(--accent);">资源加载中...</div>
+            <div v-else class="grid">
                 <div v-for="item in list" :key="item.vod_id" class="card" @click="getDetails(item.vod_id)">
                     <span class="remark">{{ item.vod_remarks }}</span>
-                    <img :src="item.vod_pic" referrerpolicy="no-referrer">
+                    <img :src="item.vod_pic" referrerpolicy="no-referrer" onerror="this.src='https://via.placeholder.com/150x200?text=No+Image'">
                     <div class="card-name">{{ item.vod_name }}</div>
                 </div>
             </div>
 
-            <div class="pagination">
+            <div class="pagination" v-if="!loading && list.length > 0">
                 <button class="nav-btn" @click="goPage(page - 1)" :disabled="page <= 1">上一页</button>
-                <span>{{ page }} / {{ pageCount }}</span>
+                <span style="font-size:14px;">{{ page }} / {{ pageCount }}</span>
                 <button class="nav-btn" @click="goPage(page + 1)" :disabled="page >= pageCount">下一页</button>
             </div>
         </div>
@@ -85,40 +97,56 @@
 
         createApp({
             setup() {
+                // 建议：如果遇到跨域拦截，可以尝试在 URL 前加上 'https://cors-anywhere.azm.workers.dev/'
                 const api = 'https://360zyzz.com/api.php/provide/vod/';
                 const list = ref([]);
                 const page = ref(1);
                 const pageCount = ref(1);
                 const wd = ref('');
+                const loading = ref(false);
                 const currentVod = ref(null);
                 const playlist = ref([]);
                 const currentEpIndex = ref(0);
                 let art = null;
 
                 const fetchData = async (p = 1, keyword = '') => {
-                    let url = `${api}?ac=videolist&pg=${p}`;
-                    if (keyword) url += `&wd=${encodeURIComponent(keyword)}`;
-                    const res = await axios.get(url);
-                    list.value = res.data.list;
-                    page.value = parseInt(res.data.page);
-                    pageCount.value = parseInt(res.data.pagecount);
+                    loading.value = true;
+                    try {
+                        let url = `${api}?ac=videolist&pg=${p}`;
+                        if (keyword) url += `&wd=${encodeURIComponent(keyword)}`;
+                        const res = await axios.get(url);
+                        list.value = res.data.list;
+                        page.value = parseInt(res.data.page);
+                        pageCount.value = parseInt(res.data.pagecount);
+                    } catch (err) {
+                        console.error(err);
+                    } finally {
+                        loading.value = false;
+                    }
                 };
 
                 const getDetails = async (id) => {
-                    const res = await axios.get(`${api}?ac=detail&ids=${id}`);
-                    const vod = res.data.list[0];
-                    currentVod.value = vod;
-                    
-                    // 解析选集列表 (格式: 第01集$url#第02集$url)
-                    const rawList = vod.vod_play_url.split('#');
-                    playlist.value = rawList.map(item => {
-                        const parts = item.split('$');
-                        return { name: parts[0], url: parts[1] };
-                    });
-                    
-                    // 默认播放第一集
-                    playVideo(playlist.value[0].url, 0);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    try {
+                        const res = await axios.get(`${api}?ac=detail&ids=${id}`);
+                        const vod = res.data.list[0];
+                        currentVod.value = vod;
+                        
+                        // 兼容多种分隔符的解析逻辑
+                        const playUrls = vod.vod_play_url.split('#');
+                        playlist.value = playUrls.map(item => {
+                            const p = item.split('$');
+                            return { name: p[0], url: p[1] };
+                        }).filter(item => item.url && item.url.includes('m3u8')); // 优先筛选m3u8格式
+                        
+                        if (playlist.value.length > 0) {
+                            playVideo(playlist.value[0].url, 0);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                        } else {
+                            alert("暂无可用播放链接");
+                        }
+                    } catch (e) {
+                        alert("获取详情失败");
+                    }
                 };
 
                 const playVideo = (url, index) => {
@@ -131,7 +159,9 @@
                         type: 'm3u8',
                         autoplay: true,
                         fullscreen: true,
+                        fullscreenWeb: true,
                         setting: true,
+                        pip: true,
                         customType: {
                             m3u8: function (video, url) {
                                 if (Hls.isSupported()) {
@@ -147,11 +177,11 @@
                 };
 
                 const search = () => { page.value = 1; fetchData(1, wd.value); };
-                const goPage = (p) => fetchData(p, wd.value);
+                const goPage = (p) => { fetchData(p, wd.value); window.scrollTo({top:0}); };
 
                 onMounted(() => fetchData());
 
-                return { list, page, pageCount, wd, currentVod, playlist, currentEpIndex, search, goPage, getDetails, playVideo };
+                return { list, page, pageCount, wd, loading, currentVod, playlist, currentEpIndex, search, goPage, getDetails, playVideo };
             }
         }).mount('#app');
     </script>
