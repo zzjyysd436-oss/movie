@@ -3,114 +3,101 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐷 私人影院 - 弹窗直达版</title>
+    <title>🐷 私人影院 (直连模式)</title>
     <style>
-        :root { --primary: #ff85a2; --bg: #0a0a0a; --card: #1a1a1a; }
+        :root { --primary: #ff85a2; --bg: #0a0a0a; }
         body { font-family: sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 10px; }
         .container { max-width: 900px; margin: 0 auto; }
-        header { display: flex; gap: 8px; margin-bottom: 15px; }
-        input { flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #444; background: #000; color: #fff; outline: none; }
-        .btn { padding: 10px 18px; border-radius: 6px; border: none; background: var(--primary); color: #fff; font-weight: bold; cursor: pointer; }
+        header { display: flex; gap: 8px; margin-bottom: 20px; }
+        input { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #444; background: #000; color: #fff; }
+        .btn { padding: 10px 20px; border-radius: 8px; border: none; background: var(--primary); color: #fff; font-weight: bold; cursor: pointer; }
         
-        /* 播放控制区 */
-        #player-box { display: none; margin-bottom: 20px; border: 1px solid #333; border-radius: 12px; background: #1a1a1a; padding: 20px; text-align: center; }
-        .play-hint { margin-bottom: 15px; color: #ff85a2; font-size: 14px; font-weight: bold; }
-        .line-bar { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
-        .line-btn { background: #444; color: #fff; border: none; padding: 8px 20px; border-radius: 5px; cursor: pointer; }
-        .line-btn:hover { background: var(--primary); }
+        /* 核心展示区 */
+        #content-box { display: none; margin-bottom: 20px; border: 1px solid #333; border-radius: 12px; overflow: hidden; background: #1a1a1a; }
+        .play-warning { padding: 15px; text-align: center; color: #ff85a2; font-size: 13px; border-bottom: 1px solid #333; }
+        .iframe-container { position: relative; width: 100%; padding-bottom: 56.25%; height: 0; }
+        iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
+        
+        .ep-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 8px; padding: 15px; max-height: 200px; overflow-y: auto; }
+        .ep-item { background: #333; color: #fff; border: none; padding: 8px; border-radius: 5px; font-size: 12px; cursor: pointer; text-align: center; }
+        .ep-item:active { background: var(--primary); }
 
-        .ep-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(65px, 1fr)); gap: 8px; max-height: 200px; overflow-y: auto; background: #000; padding: 10px; border-radius: 8px; }
-        .ep-btn { background: #333; color: #ccc; border: 1px solid #444; padding: 6px; border-radius: 4px; font-size: 11px; cursor: pointer; }
-        .ep-btn.active { background: var(--primary); color: #fff; }
-
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 15px; }
-        .card { background: var(--card); border-radius: 8px; overflow: hidden; border: 1px solid #333; cursor: pointer; }
-        .card img { width: 100%; height: 180px; object-fit: cover; }
-        .card div { padding: 8px; text-align: center; font-size: 12px; }
+        .movie-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; }
+        .movie-card { background: #1a1a1a; border-radius: 10px; overflow: hidden; cursor: pointer; border: 1px solid #222; }
+        .movie-card img { width: 100%; height: 190px; object-fit: cover; }
+        .movie-card p { padding: 10px; margin: 0; text-align: center; font-size: 13px; }
     </style>
 </head>
 <body>
 <div class="container">
     <header>
-        <input type="text" id="kw" placeholder="输入片名搜索...">
+        <input type="text" id="kw" placeholder="输入你想看的片名...">
         <button class="btn" onclick="search()">搜索</button>
     </header>
 
-    <div id="player-box">
-        <div class="play-hint">⚠️ 网页播放器已被拦截，请点击下方线路跳转播放 ⚠️</div>
-        <div class="line-bar">
-            <button class="line-btn" onclick="openVideo(0)">🚀 线路1 (新窗口播放)</button>
-            <button class="line-btn" onclick="openVideo(1)">📺 线路2 (备用)</button>
+    <div id="content-box">
+        <div class="play-warning">正在调用直连播放器，如无法加载请切换流量测试</div>
+        <div class="iframe-container">
+            <iframe id="main-player" allowfullscreen="true" src="about:blank"></iframe>
         </div>
-        <div id="epGrid" class="ep-grid"></div>
+        <div id="ep-grid" class="ep-list"></div>
     </div>
 
-    <div id="mainGrid" class="grid"></div>
+    <div id="movie-grid" class="movie-grid"></div>
 </div>
 
 <script>
     const API = "https://cj.lziapi.com/api.php/provide/vod/";
-    const JX_LIST = [
-        "https://jx.777jiexi.com/player/?url=",
-        "https://jx.aidouer.net/?url="
-    ];
-    let currentVUrl = "";
+    // 关键：不再使用第三方解析，直接调用资源站自带的 M3U8 播放内核
+    const DIRECT_PLAYER = "https://lzihls.com/?url=";
 
-    window.onload = () => load(`&h=24`);
+    window.onload = () => loadData(`&h=24`);
 
-    async function load(p) {
-        const grid = document.getElementById('mainGrid');
-        grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:50px;">正在获取资源...</div>`;
+    async function loadData(params) {
+        const grid = document.getElementById('movie-grid');
+        grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:50px;">📡 正在直连资源站...</div>`;
         try {
-            const res = await fetch(`${API}?ac=videolist${p}`);
+            const res = await fetch(`${API}?ac=videolist${params}`);
             const data = await res.json();
             grid.innerHTML = "";
             data.list.forEach(item => {
                 const div = document.createElement('div');
-                div.className = 'card';
-                div.innerHTML = `<img src="${item.vod_pic}"><div>${item.vod_name}</div>`;
-                div.onclick = () => showControl(item);
+                div.className = 'movie-card';
+                div.innerHTML = `<img src="${item.vod_pic}"><p>${item.vod_name}</p>`;
+                div.onclick = () => showDetail(item);
                 grid.appendChild(div);
             });
-        } catch(e) { grid.innerHTML = "网络不稳定"; }
+        } catch(e) { grid.innerHTML = "网络拦截，请刷新重试"; }
     }
 
     function search() {
-        const v = document.getElementById('kw').value;
-        if(v) load(`&wd=${encodeURIComponent(v)}`);
+        const val = document.getElementById('kw').value;
+        if(val) loadData(`&wd=${encodeURIComponent(val)}`);
     }
 
-    function showControl(item) {
-        document.getElementById('player-box').style.display = 'block';
+    function showDetail(item) {
+        document.getElementById('content-box').style.display = 'block';
         window.scrollTo({top: 0, behavior: 'smooth'});
-        const grid = document.getElementById('epGrid');
+        const grid = document.getElementById('ep-grid');
         grid.innerHTML = "";
-        const eps = item.vod_play_url.split('$$$')[0].split('#');
+        
+        // 分割剧集数据
+        const playlist = item.vod_play_url.split('$$$')[0];
+        const eps = playlist.split('#');
 
         eps.forEach((ep, i) => {
-            const info = ep.split('$');
-            if(info.length < 2) return;
+            const [name, url] = ep.split('$');
+            if(!url) return;
             const btn = document.createElement('button');
-            btn.className = 'ep-btn';
-            btn.innerText = info[0];
+            btn.className = 'ep-item';
+            btn.innerText = name;
             btn.onclick = () => {
-                document.querySelectorAll('.ep-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                currentVUrl = info[1];
-                openVideo(0); // 选中集数时自动尝试打开线路1
+                // 重点：不再中转，直接拼接资源站的播放器域名
+                document.getElementById('main-player').src = DIRECT_PLAYER + url;
             };
             grid.appendChild(btn);
+            if(i === 0) btn.click();
         });
-    }
-
-    function openVideo(idx) {
-        if(!currentVUrl) {
-            alert("请先选择集数");
-            return;
-        }
-        const playUrl = JX_LIST[idx] + currentVUrl;
-        // 关键：直接弹出新窗口，彻底绕过原网页的加载失败限制
-        window.open(playUrl, '_blank');
     }
 </script>
 </body>
