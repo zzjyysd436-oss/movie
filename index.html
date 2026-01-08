@@ -3,18 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐷 私人影院</title>
+    <title>🐷 私人影院 - 增强兼容版</title>
     <style>
         :root { --primary: #ff85a2; --bg: #0a0a0a; --card: #1a1a1a; }
         body { font-family: sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 10px; }
         .container { max-width: 900px; margin: 0 auto; }
         header { display: flex; gap: 8px; margin-bottom: 15px; }
-        input { flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #444; background: #000; color: #fff; }
+        input { flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #444; background: #000; color: #fff; outline: none; }
         .btn { padding: 10px 18px; border-radius: 6px; border: none; background: var(--primary); color: #fff; font-weight: bold; cursor: pointer; }
         
         #player-box { display: none; margin-bottom: 20px; border: 1px solid #333; border-radius: 12px; overflow: hidden; background: #000; }
-        /* 增加线路切换条 */
-        .line-bar { background: #222; padding: 8px 12px; border-bottom: 1px solid #333; display: flex; align-items: center; gap: 10px; }
+        .line-bar { background: #222; padding: 8px 12px; border-bottom: 1px solid #333; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .line-btn { background: #444; color: #fff; border: none; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; }
         .line-btn.active { background: var(--primary); }
 
@@ -26,24 +25,25 @@
         .ep-btn.active { background: var(--primary); color: #fff; }
 
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 15px; }
-        .card { background: var(--card); border-radius: 8px; overflow: hidden; border: 1px solid #333; cursor: pointer; }
+        .card { background: var(--card); border-radius: 8px; overflow: hidden; border: 1px solid #333; cursor: pointer; transition: 0.3s; }
+        .card:hover { border-color: var(--primary); }
         .card img { width: 100%; height: 180px; object-fit: cover; }
-        .card div { padding: 8px; text-align: center; font-size: 12px; }
+        .card div { padding: 8px; text-align: center; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     </style>
 </head>
 <body>
 <div class="container">
     <header>
-        <input type="text" id="kw" placeholder="输入你想看的..." onkeydown="if(event.keyCode==13) search()">
+        <input type="text" id="kw" placeholder="输入片名（建议缩短关键词）..." onkeydown="if(event.keyCode==13) search()">
         <button class="btn" onclick="search()">搜索</button>
     </header>
 
     <div id="player-box">
         <div class="line-bar">
-            <span style="font-size:11px;color:#888;">加载失败请切线 ➔</span>
-            <button class="line-btn active" onclick="changeLine(0)">线路1</button>
-            <button class="line-btn" onclick="changeLine(1)">线路2</button>
-            <button class="line-btn" onclick="changeLine(2)">线路3</button>
+            <span style="font-size:11px;color:#888;">线路1报错请切线路2 ➔</span>
+            <button class="line-btn active" onclick="changeLine(0)">线路1(保底线)</button>
+            <button class="line-btn" onclick="changeLine(1)">线路2(高速线)</button>
+            <button class="line-btn" onclick="changeLine(2)">线路3(备用线)</button>
         </div>
         <div class="iframe-wrap"><iframe id="ifr" allowfullscreen="true"></iframe></div>
         <div id="epGrid" class="ep-grid"></div>
@@ -54,11 +54,12 @@
 
 <script>
     const API = "https://cj.lziapi.com/api.php/provide/vod/";
-    // 增加多个不同的解析接口，分散被封锁的风险
+    
+    // 根据第四条建议：更换了第一条为更隐蔽的 777解析口，并保留其他备用源
     const JX_LIST = [
-        "https://jx.jsonplayer.com/player/?url=",
-        "https://jx.aidouer.net/?url=",
-        "https://www.mtosz.com/ylys.php?url="
+        "https://jx.777jiexi.com/player/?url=", // 保底建议线路
+        "https://jx.aidouer.net/?url=",          // 备用线路A
+        "https://www.mtosz.com/ylys.php?url="    // 备用线路B
     ];
     let currentVUrl = "";
 
@@ -66,11 +67,15 @@
 
     async function load(p) {
         const grid = document.getElementById('mainGrid');
-        grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:50px;">正在获取列表...</div>`;
+        grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:50px;color:#888;">📡 正在拉取最新资源列表...</div>`;
         try {
             const res = await fetch(`${API}?ac=videolist${p}`);
             const data = await res.json();
             grid.innerHTML = "";
+            if (!data.list || data.list.length === 0) {
+                grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:50px;">未搜到结果，请尝试缩短搜索词</div>`;
+                return;
+            }
             data.list.forEach(item => {
                 const div = document.createElement('div');
                 div.className = 'card';
@@ -78,7 +83,9 @@
                 div.onclick = () => showPlayer(item);
                 grid.appendChild(div);
             });
-        } catch(e) { grid.innerHTML = "网络不稳定"; }
+        } catch(e) { 
+            grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:50px;color:red;">API 连接失败，请检查网络或更换 DNS</div>`; 
+        }
     }
 
     function search() {
@@ -91,7 +98,10 @@
         window.scrollTo({top: 0, behavior: 'smooth'});
         const grid = document.getElementById('epGrid');
         grid.innerHTML = "";
-        const eps = item.vod_play_url.split('$$$')[0].split('#');
+        
+        // 解析播放列表数据
+        const rawUrl = item.vod_play_url.split('$$$')[0];
+        const eps = rawUrl.split('#');
 
         eps.forEach((ep, i) => {
             const info = ep.split('$');
@@ -103,7 +113,7 @@
                 document.querySelectorAll('.ep-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 currentVUrl = info[1];
-                changeLine(0); // 默认线路1
+                changeLine(0); // 默认使用建议的保底线路
             };
             grid.appendChild(btn);
             if(i === 0) btn.click();
@@ -112,6 +122,7 @@
 
     function changeLine(idx) {
         const ifr = document.getElementById('ifr');
+        // 将视频地址拼接在解析接口后
         ifr.src = JX_LIST[idx] + currentVUrl;
         
         const btns = document.querySelectorAll('.line-btn');
